@@ -1,48 +1,44 @@
 #include <coroutine>
 #include <iostream>
 #include <utility>
-class CoroType
-{
+class CoroType {
 public:
-    struct promise_type{
-        CoroType get_return_object()
-        { 
+    struct promise_type {
+        CoroType get_return_object() { 
             return CoroType{
                 std::coroutine_handle<promise_type>::from_promise(*this)
             };
         }
-        
-        std::suspend_always initial_suspend()
-        { return {}; }
-        
-        std::suspend_always yield_value(int val)
-        {
+        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_always yield_value(int val) {
             value = val;
             return {};
-        };
-        
-        void return_void(){}
-        void unhandled_exception(){}
+        }
+        void return_void() {}
+        void unhandled_exception() { std::terminate(); }
         std::suspend_always final_suspend() noexcept { return {}; }
-
-        int value;
+        int value = 0;
     };
 
-public:
+    explicit CoroType(std::coroutine_handle<promise_type> h) : handle(h) {}
+    CoroType(const CoroType&) = delete;
+    CoroType& operator=(const CoroType&) = delete;
+    CoroType(CoroType&& other) noexcept : handle(std::exchange(other.handle, {})) {}
+    CoroType& operator=(CoroType&& other) noexcept {
+        if (this != &other) {
+            if (handle) handle.destroy();
+            handle = std::exchange(other.handle, {});
+        }
+        return *this;
+    }
+    ~CoroType() { if (handle) handle.destroy(); }
 
-    CoroType(std::coroutine_handle<promise_type> h) :
-        handle(h)
-    {}
-public:
-    // user interface members
     void resume() { handle.resume(); }
     int get_next() { 
         resume();
         return handle.promise().value; 
     }
-
 private:
-    // member vars
     std::coroutine_handle<promise_type> handle;
 };
 
